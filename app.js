@@ -71,8 +71,8 @@ app.post("/processVideo", upload.single("video"), (req, res) => {
       try {
         const { data } = await axios({
           method: "post",
-          // url: "https://api.cloudinary.com/v1_1/daxr7lj1c/video/upload",   //sahil account
-          url: "https://api.cloudinary.com/v1_1/dckalnsaj/video/upload",      //tech account
+          url: "https://api.cloudinary.com/v1_1/daxr7lj1c/video/upload",   //sahil account
+          //url: "https://api.cloudinary.com/v1_1/dckalnsaj/video/upload",      //tech account
           data: formData,
         });
         const url = data.url.replace(
