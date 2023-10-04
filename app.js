@@ -66,14 +66,14 @@ app.post("/processVideo", upload.single("video"), (req, res) => {
       const blob = new Blob([outputVideoBuffer]);
 
       formData.append("file", blob);
-      formData.append("upload_preset", "q1gh8rnp");      //sahil account
-      //formData.append("upload_preset", "dckalnsaj");    //tech account
+      //formData.append("upload_preset", "q1gh8rnp");      //sahil account
+      formData.append("upload_preset", "jpxsdx8y");    //tech account
 
       try {
         const { data } = await axios({
           method: "post",
-          url: "https://api.cloudinary.com/v1_1/daxr7lj1c/video/upload",   //sahil account
-          //url: "https://api.cloudinary.com/v1_1/dckalnsaj/video/upload",      //tech account
+          //url: "https://api.cloudinary.com/v1_1/daxr7lj1c/video/upload",   //sahil account
+          url: "https://api.cloudinary.com/v1_1/dckalnsaj/video/upload",      //tech account
           data: formData,
         });
         const url = data.url.replace(
