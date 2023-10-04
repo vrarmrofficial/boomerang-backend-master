@@ -8,7 +8,8 @@ const axios = require("axios");
 // const fs = require("fs");
 const fs = require('@cyclic.sh/s3fs')(process.env.S3_BUCKET_NAME)
 
-const HEART_IMAGE_PATH = "./heart.png";
+// const HEART_IMAGE_PATH = "./heart.png";
+const HEART_IMAGE_PATH = "./heart_scaled_down.png";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -47,7 +48,7 @@ app.post("/processVideo", upload.single("video"), (req, res) => {
     .complexFilter([
       {
         filter: "scale",
-        options: "2048:2732", // Resize the video to 2048x2732
+        options: "1024:1366", // Resize the video to 2048x2732
         outputs: "scaled_video",
       },
       {
