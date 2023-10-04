@@ -66,8 +66,8 @@ app.post("/processVideo", upload.single("video"), (req, res) => {
       const blob = new Blob([outputVideoBuffer]);
 
       formData.append("file", blob);
-      // formData.append("upload_preset", "q1gh8rnp");      //sahil account
-      formData.append("upload_preset", "dckalnsaj");    //tech account
+      formData.append("upload_preset", "q1gh8rnp");      //sahil account
+      //formData.append("upload_preset", "dckalnsaj");    //tech account
 
       try {
         const { data } = await axios({
