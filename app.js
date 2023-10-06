@@ -5,8 +5,16 @@ const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const cors = require("cors");
 const axios = require("axios");
-// const fs = require("fs");
-const fs = require('@cyclic.sh/s3fs')(process.env.S3_BUCKET_NAME)
+const fs = require("fs");
+const AWS = require('aws-sdk');
+require('dotenv').config();
+
+const s3 = new AWS.S3({
+  accessKeyId: process.env.ACCESS_KEY_ID,
+  secretAccessKey: process.env.SECRET_ACCESS_KEY
+});
+
+const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME;
 
 // const HEART_IMAGE_PATH = "./heart.png";
 const HEART_IMAGE_PATH = "./heart_scaled_down.png";
@@ -41,65 +49,96 @@ app.post("/processVideo", upload.single("video"), (req, res) => {
   const inputVideo = path.join(__dirname, "uploads", req.file.originalname);
   const overlayImage = HEART_IMAGE_PATH; // Path to the overlay image
   const outputVideo = `./outputs/${Date.now()}-output.mp4`; // Path to the output video
+  const outputGifName = `${Date.now()}-output.gif`;
+  const outputGif = `./outputs/${outputGifName}`;
 
-  ffmpeg()
-    .input(inputVideo)
-    .input(overlayImage)
-    .complexFilter([
-      {
-        filter: "scale",
-        options: "1024:1366", // Resize the video to 2048x2732
-        outputs: "scaled_video",
-      },
-      {
-        filter: "overlay",
-        options: { x: 0, y: "H-h" }, // Overlay at the bottom (0, H-h)
-        inputs: "scaled_video",
-      },
-    ])
-    .output(outputVideo)
-    .on("end", async () => {
-      //upload to cloudinary
-      const formData = new FormData();
+  const convertToGif = () => {
+    ffmpeg()
+      .input(outputVideo)
+      .complexFilter('[0]reverse[r];[0][r]concat=n=2:v=1:a=0[v]')
+      .map('[v]')
+      .output(outputGif)
+      .on('end', () => {
+        const outputGifBuffer = fs.readFileSync(outputGif);
 
-      const outputVideoBuffer = fs.readFileSync(outputVideo);
-      const blob = new Blob([outputVideoBuffer]);
+        try {
+          s3.upload({
+            Bucket: S3_BUCKET_NAME,
+            Key: outputGifName,
+            Body: outputGifBuffer,
+            ACL: 'public-read'
+          }, (err, data) => {
+            if (err) {
+              console.error(err);
 
-      formData.append("file", blob);
-      //formData.append("upload_preset", "q1gh8rnp");      //sahil account
-      formData.append("upload_preset", "jpxsdx8y");    //tech account
+              fs.unlinkSync(outputGif);
+              fs.unlinkSync(outputVideo);
+              fs.unlinkSync(inputVideo);
 
-      try {
-        const { data } = await axios({
-          method: "post",
-          //url: "https://api.cloudinary.com/v1_1/daxr7lj1c/video/upload",   //sahil account
-          url: "https://api.cloudinary.com/v1_1/dckalnsaj/video/upload",      //tech account
-          data: formData,
-        });
-        const url = data.url.replace(
-          "upload/",
-          "upload/f_gif/e_boomerang/e_loop/"
-        );
+              console.log("error", err);
+              res.status(500).send("Video processing error.");
+            } else {
+              fs.unlinkSync(outputGif);
+              fs.unlinkSync(outputVideo);
+              fs.unlinkSync(inputVideo);
 
-        axios.get(url);
+              res.status(200).send({ url: data.Location });
+            }
+          });
+        } catch (err) {
+          console.error(err);
 
+          fs.unlinkSync(outputGif);
+          fs.unlinkSync(outputVideo);
+          fs.unlinkSync(inputVideo);
+
+          console.log("error", err);
+          res.status(500).send("Video processing error.");
+        }
+      })
+      .on('error', (err) => {
         fs.unlinkSync(outputVideo);
         fs.unlinkSync(inputVideo);
+        console.error('Error (Conversion to GIF):', err);
+      })
+      .run();
+  }
 
-        res.status(200).send({ url });
-      } catch (error) {
-        fs.unlinkSync(outputVideo);
+  const addHeartFrameToVideo = () => {
+    ffmpeg()
+      .input(inputVideo)
+      .input(overlayImage)
+      .complexFilter([
+        {
+          filter: "scale",
+          options: "1024:1024", // Resize the video to 1024x1024
+          outputs: "scaled_video",
+        },
+        {
+          filter: "pad",
+          options: "1024:1366:0:342", // Add padding to the top to fit the video at the bottom
+          outputs: "padded_frame",
+          inputs: "scaled_video",
+        },
+        {
+          filter: "overlay",
+          options: { x: 0, y: 0 }, // Overlay at the bottom (0, 342 pixels from the top)
+          inputs: ["padded_frame", "1:v"], // Use "1:v" to reference the overlay image
+        }
+      ])
+      .output(outputVideo)
+      .on("end", () => {
+        convertToGif();
+      })
+      .on("error", (err) => {
         fs.unlinkSync(inputVideo);
-
-        console.log("error", error);
+        console.error("Error:", err);
         res.status(500).send("Video processing error.");
-      }
-    })
-    .on("error", (err) => {
-      console.error("Error:", err);
-      res.status(500).send("Video processing error.");
-    })
-    .run();
+      })
+      .run();
+  }
+
+  addHeartFrameToVideo();
 });
 
 app.listen(port, () => {
